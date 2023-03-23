@@ -11,118 +11,110 @@ USE northwind;
  estén entre 50 y 100. Por último, ordena los resultados por 
  código de proveedor de forma ascendente. */
  
--- qué piden: todos los campos de productos cuando...
--- 1) sus proveedores_id sean 1,3,7,8,9
--- 2) que tengan stock en el almacen
--- 3) cuyos precios unitarios estén entre 50 y 100
--- ORDENA los resultados: ORDER BY* por proveedor_id ASC
--- TABLAS: products
-
--- CON CTEs:
-
-WITH cte1 AS(
-			 SELECT supplier_id, unit_price, units_in_stock
-			 FROM products
-			 WHERE supplier_id IN (1,3,7,8,9) AND unit_price BETWEEN 50 AND 100 AND units_in_stock > 0)
-			
 SELECT * 
-FROM cte1
-ORDER BY supplier_id ASC;
+FROM products
+WHERE supplier_id IN (1, 3, 7, 8, 9) AND units_in_stock <> 0
+HAVING unit_price BETWEEN 50 AND 100
+ORDER BY supplier_id;
 
-WITH cte2 AS(
+-- Intento con una CTE:
+WITH Productos AS(
 			 SELECT *
 			 FROM products
-			 WHERE supplier_id IN (1,3,7,8,9) AND unit_price BETWEEN 50 AND 100 AND units_in_stock > 0)
+			 WHERE supplier_id IN (1,3,7,8,9) AND unit_price BETWEEN 50 AND 100 AND units_in_stock <> 0)
 			
-SELECT supplier_id, unit_price, units_in_stock
-FROM cte2
+SELECT *
+FROM Productos
 ORDER BY supplier_id ASC;
--- Se podría hacer con una subconsulta con ALL...(chequear apuntes consultas múltiples tablas4)
--- CON UNA CONSULTA DONDE HAY WHERE Y MÚLTIPLES CONDICIONES:
 
-SELECT supplier_id, unit_price, units_in_stock
-FROM products
-WHERE supplier_id IN (1,3,7,8,9) AND unit_price BETWEEN 50 AND 100 AND units_in_stock > 0;
--- ORDER BY supplier_id ASC -> te lo da por defecto así 
-
-SELECT*
-FROM products; -- mirar bien si se podría hacer con una suconsulta en el where o en el from...
--- o un self-join pero este último dudo
- 
   /*2. Devuelve el nombre y apellidos y el id de los empleados con códigos entre el 3 y el 6, 
   además que hayan vendido a clientes que tengan códigos que comiencen con las letras de la A
   hasta la G. Por último, en esta búsqueda queremos filtrar solo por aquellos envíos que 
   la fecha de pedido este comprendida entre el 22 y el 31 de Diciembre de cualquier año.*/
   
-  -- nombre y apellidos + id_empleados (tabla employees) cuando...
-  -- 1) sus id_empleados entre 3 y 6
-  -- 2) que hayan vendido a clientes con códigos que empiecen por la [a-g]% (orders)
-  -- 3) cuyas order_date estén comprendidas entre el 22 y 31 de diciembre de cualquier año (orders)
   
-  -- 2 y 3 en cte (orders)
-  -- luego joins con employeessuppliers
+SELECT employee_id, first_name, last_name
+  FROM employees
+  NATURAL JOIN orders
+  WHERE employee_id IN (3,4,5,6) AND customer_id REGEXP '^[A-G].*' AND MONTH(order_date) = 12 AND DAY(order_date) BETWEEN 22 AND 31;
   
   /*3.Calcula el precio de venta de cada pedido una vez aplicado el descuento. 
   Muestra el id del la orden, el id del producto, el nombre del producto, el precio unitario,
   la cantidad, el descuento y el precio de venta después de haber aplicado el descuento.*/
-  -- TABLA: order_details
-  -- qué piden: precio venta (ya aplicado el descuento): columna auxiliar con función agregada in
-  -- para calcular precio venta: unit_price - (unit_price * discount)
-  -- mostrar: order_id, product_id, product_name (en tabla products, hay que relacionarlas)
-  -- mostrar: ... unit_price, quantity, discount y precio de venta después de aplicar discount.
-  
-  SELECT o.order_id, o.product_id, p.product_name, o.unit_price, o.quantity, o.discount, ROUND(o.unit_price - (o.unit_price * o.discount),2) AS PrecioVenta
+ 
+  SELECT o.order_id, o.product_id, p.product_name, o.unit_price, o.quantity, o.discount, ROUND((o.unit_price * quantity) * (1- o.discount),2) AS PrecioVenta
   FROM order_details AS o
-  NATURAL JOIN products AS p;
+  INNER JOIN products AS p
+  ON o.product_id = p.product_id
+  ORDER BY order_id;
   
   /*4. Usando una subconsulta, muestra los productos cuyos precios estén por encima del precio medio 
   total de los productos de la BBDD.*/
   -- CON SUBCONSULTA
   -- mostrar productos cuyos precios > del precio medio total de los productos de la BBDD
-    
-  SELECT SUM(unit_price) / COUNT(unit_price)
+  
+-- PEQUEÑA SUBCONSULTA DE AYUDA:
+  SELECT AVG(unit_price)
   FROM products; -- precio medio de todos los productos es 28.86
   
-  SELECT product_id, product_name -- o todo con *
-  FROM products
-  WHERE unit_price > (SELECT SUM(unit_price) / COUNT(unit_price)
-					  FROM products);
+SELECT product_name, unit_price
+FROM products
+WHERE unit_price > (SELECT ROUND(AVG(unit_price), 2)
+                    FROM products);
    
   /*5. ¿Qué productos ha vendido cada empleado y cuál es la cantidad vendida de cada uno de ellos?*/
   
-  -- los productos vendidos por cada uno de los empleados ((product_name), product_id) y employee_id
-  -- relación tablas: products, order_details (product_id ) OPCIONAL
-  -- relación tablas: order_details y orders con order_id
-  -- relación tablas: orders y employees con employee_id
-  
-  SELECT *
-  FROM order_details;
-  
-  SELECT o1.product_id, o3.first_name AS Comercial, o2.employee_id, o1. quantity
-  FROM order_details AS o1
-  NATURAL JOIN orders AS o2
-  NATURAL JOIN employees AS o3;
+SELECT first_name AS "Nombre", last_name AS "Apellido", product_name AS "Producto", SUM(quantity) AS "Cantidad_total_vendida", employees.employee_id
+FROM employees
+INNER JOIN orders
+	ON employees.employee_id = orders.employee_id
+INNER JOIN order_details
+	ON order_details.order_id = orders.order_id
+INNER JOIN products
+	ON order_details.product_id = products.product_id
+GROUP BY employees.employee_id, products.product_name
+ORDER BY employees.employee_id, Producto;
+
+  -- Se hace esa unión de tablas a través de INNER JOIN para poder ir accediendo a cada una de las informaciones
+  -- que se van solicitando para poder sacar la consulta y completarla:
+  -- De la primera tabla "employees" sacamos los datos de los empleados. Esta se une a "orders" para, después,
+  -- poder hacer la unión con order_details y poder acceder a la información de quantity y sacar un compendio de productos totales.
+  -- Se realiza así, sucesivamente, con la tabla "products" para poder llegar al nombre del producto.
   
   /*6.Basándonos en la query anterior, ¿qué empleado es el que vende más productos? 
   Soluciona este ejercicio con una subquery 
   BONUS ¿Podríais solucionar este mismo ejercicio con una CTE?*/
-  -- SUBCONSULTAS:
-  -- habría que hacer un SUM de productos/cantidad por empleado?
   
-  SELECT o3.first_name AS Comercial, o2.employee_id, SUM(o1. quantity) AS TotalProductosVendidos
-  FROM order_details AS o1
-  NATURAL JOIN orders AS o2
-  NATURAL JOIN employees AS o3
-  GROUP BY Comercial, o2.employee_id;
-  
+  SELECT first_name AS "Nombre", last_name AS "Apellido", COUNT(product_name) AS "Número_productos_vendidos"
+    FROM (
+			SELECT DISTINCT  first_name, last_name, employees.employee_id, product_name
+			FROM employees
+			INNER JOIN orders -- necesitas poner el distinct para ver cuánto vende realmente cada personaporque sino cambian los datos
+				ON employees.employee_id = orders.employee_id
+			INNER JOIN order_details
+				ON order_details.order_id = orders.order_id
+			INNER JOIN products
+				ON order_details.product_id = products.product_id) AS empleados_productos
+    GROUP BY employee_id;
+    
+    -- Se toma la consulta anterior y para poder tomarla como referencia se usa en el FROM para, así, 
+    -- poder obtener los datos que se solicitan ahora. Se hace un conteo del nombre de los productos
+    -- (podría haber sido el id del producto) para obtener así el dato del número de productos que vende cada trabajador.
  /* BONUS ¿Podríais solucionar este mismo ejercicio con una CTE?*/
  
-WITH cte4 AS(
-			  SELECT employee_id, first_name AS Comercial
-              FROM employees)
-                                          
-SELECT employee_id, Comercial, SUM(quantity) AS TotalProductosVendidos
-FROM cte4
-NATURAL JOIN orders
-NATURAL JOIN order_details
-GROUP BY Comercial, employee_id;
+ WITH empleados_productos AS (
+			SELECT DISTINCT first_name AS "Nombre", last_name AS "Apellido", employees.employee_id AS "IDEmpleado", product_name AS "Producto"
+			FROM employees
+			INNER JOIN orders
+				ON employees.employee_id = orders.employee_id
+			INNER JOIN order_details
+				ON order_details.order_id = orders.order_id
+			INNER JOIN products
+				ON order_details.product_id = products.product_id)
+                
+	SELECT Nombre, Apellido, COUNT(Producto) AS "Número_productos_vendidos"
+    FROM empleados_productos
+    GROUP BY IDEmpleado;
+    
+    -- Se realiza un conteo de los productos para sacar el número de productos diferentes que vende
+    -- cada uno de los empleados.
