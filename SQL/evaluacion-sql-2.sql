@@ -100,21 +100,5 @@ ORDER BY employees.employee_id, Producto;
     -- Se toma la consulta anterior y para poder tomarla como referencia se usa en el FROM para, así, 
     -- poder obtener los datos que se solicitan ahora. Se hace un conteo del nombre de los productos
     -- (podría haber sido el id del producto) para obtener así el dato del número de productos que vende cada trabajador.
+
  /* BONUS ¿Podríais solucionar este mismo ejercicio con una CTE?*/
- 
- WITH empleados_productos AS (
-			SELECT DISTINCT first_name AS "Nombre", last_name AS "Apellido", employees.employee_id AS "IDEmpleado", product_name AS "Producto"
-			FROM employees
-			INNER JOIN orders
-				ON employees.employee_id = orders.employee_id
-			INNER JOIN order_details
-				ON order_details.order_id = orders.order_id
-			INNER JOIN products
-				ON order_details.product_id = products.product_id)
-                
-	SELECT Nombre, Apellido, COUNT(Producto) AS "Número_productos_vendidos"
-    FROM empleados_productos
-    GROUP BY IDEmpleado;
-    
-    -- Se realiza un conteo de los productos para sacar el número de productos diferentes que vende
-    -- cada uno de los empleados.
